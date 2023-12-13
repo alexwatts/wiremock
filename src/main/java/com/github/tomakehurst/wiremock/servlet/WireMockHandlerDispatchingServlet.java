@@ -40,8 +40,7 @@ import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
@@ -255,9 +254,21 @@ public class WireMockHandlerDispatchingServlet extends HttpServlet {
       if (httpServletResponse instanceof org.eclipse.jetty.server.Response) {
         final org.eclipse.jetty.server.Response jettyResponse =
             (org.eclipse.jetty.server.Response) httpServletResponse;
-        jettyResponse.setStatusWithReason(response.getStatus(), response.getStatusMessage());
+
+        jettyResponse.setStatus(response.getStatus());
+        //        jettyResponse.write(
+        //                false,
+        //            ByteBuffer.wrap(response.getStatusMessage().getBytes(StandardCharsets.UTF_8)),
+        //            Callback.NOOP);
       } else {
-        httpServletResponse.setStatus(response.getStatus(), response.getStatusMessage());
+        httpServletResponse.setStatus(response.getStatus());
+        //        ((ServletApiResponse) httpServletResponse)
+        //            .getResponse()
+        //            .write(
+        //                    false,
+        //
+        // ByteBuffer.wrap(response.getStatusMessage().getBytes(StandardCharsets.UTF_8)),
+        //                Callback.NOOP);
       }
     }
 
@@ -293,12 +304,6 @@ public class WireMockHandlerDispatchingServlet extends HttpServlet {
       out.flush();
     } catch (IOException e) {
       throwUnchecked(e);
-    } finally {
-      try {
-        content.close();
-      } catch (IOException e) {
-        // well, we tried
-      }
     }
   }
 

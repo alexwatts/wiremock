@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2022 Thomas Akehurst
+ * Copyright (C) 2012-2023 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,7 @@
  */
 package com.github.tomakehurst.wiremock.testsupport;
 
-import jakarta.servlet.AsyncContext;
-import jakarta.servlet.DispatcherType;
-import jakarta.servlet.RequestDispatcher;
-import jakarta.servlet.ServletContext;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletInputStream;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
+import jakarta.servlet.*;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -185,12 +178,6 @@ public class MockHttpServletRequest implements HttpServletRequest {
   }
 
   @Override
-  public String getRealPath(String path) {
-
-    return null;
-  }
-
-  @Override
   public int getRemotePort() {
 
     return 0;
@@ -248,6 +235,21 @@ public class MockHttpServletRequest implements HttpServletRequest {
   @Override
   public DispatcherType getDispatcherType() {
     throw new UnsupportedOperationException("not yet implemented");
+  }
+
+  @Override
+  public String getRequestId() {
+    return null;
+  }
+
+  @Override
+  public String getProtocolRequestId() {
+    return null;
+  }
+
+  @Override
+  public ServletConnection getServletConnection() {
+    return null;
   }
 
   @Override
@@ -397,12 +399,6 @@ public class MockHttpServletRequest implements HttpServletRequest {
 
   @Override
   public boolean isRequestedSessionIdFromURL() {
-
-    return false;
-  }
-
-  @Override
-  public boolean isRequestedSessionIdFromUrl() {
 
     return false;
   }

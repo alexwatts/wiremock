@@ -18,24 +18,17 @@ package com.github.tomakehurst.wiremock.jetty11;
 import org.eclipse.jetty.server.*;
 import org.eclipse.jetty.util.Callback;
 
-public class HttpsProxyDetectingHandler extends Handler.Wrapper {
+public class EarliestUrlRecordingHandler extends Handler.Wrapper {
 
-  public static final String IS_HTTPS_PROXY_REQUEST_ATTRIBUTE = "wiremock.isHttpsProxyRequest";
+  public static final String EARLIEST_URI_REQUEST_ATTRIBUTE = "wiremock.earliestUri";
 
-  private final ServerConnector mitmProxyConnector;
-
-  public HttpsProxyDetectingHandler(ServerConnector mitmProxyConnector) {
-    this.mitmProxyConnector = mitmProxyConnector;
-  }
+  public EarliestUrlRecordingHandler() {}
 
   @Override
   public boolean handle(Request request, Response response, Callback callback) throws Exception {
-    final int httpsProxyPort = mitmProxyConnector.getLocalPort();
-    if (((NetworkTrafficServerConnector) request.getConnectionMetaData().getConnector())
-            .getLocalPort()
-        == httpsProxyPort) {
-      request.setAttribute(IS_HTTPS_PROXY_REQUEST_ATTRIBUTE, true);
-    }
+    // if (request.getAttribute(EARLIEST_URI_REQUEST_ATTRIBUTE) == null) {
+    request.setAttribute(EARLIEST_URI_REQUEST_ATTRIBUTE, request.getHttpURI().getScheme());
+    // }
     return false;
   }
 }

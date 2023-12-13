@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2022 Thomas Akehurst
+ * Copyright (C) 2014-2023 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import com.github.tomakehurst.wiremock.http.AdminRequestHandler;
 import com.github.tomakehurst.wiremock.http.HttpServer;
 import com.github.tomakehurst.wiremock.http.HttpServerFactory;
 import com.github.tomakehurst.wiremock.http.StubRequestHandler;
-import com.github.tomakehurst.wiremock.jetty11.Jetty11HttpServer;
+import com.github.tomakehurst.wiremock.jetty11.Jetty12HttpServer;
 
 public class JettyHttpServerFactory implements HttpServerFactory {
   @Override
@@ -28,6 +28,6 @@ public class JettyHttpServerFactory implements HttpServerFactory {
       Options options,
       AdminRequestHandler adminRequestHandler,
       StubRequestHandler stubRequestHandler) {
-    return new Jetty11HttpServer(options, adminRequestHandler, stubRequestHandler);
+    return new Jetty12HttpServer(options, adminRequestHandler, stubRequestHandler);
   }
 }

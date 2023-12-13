@@ -15,14 +15,22 @@
  */
 package com.github.tomakehurst.wiremock.servlet;
 
+import static com.github.tomakehurst.wiremock.common.Exceptions.throwUnchecked;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.github.tomakehurst.wiremock.common.Exceptions;
+import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
+import com.github.tomakehurst.wiremock.verification.diff.DiffEventData;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletResponseWrapper;
+import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 public class TrailingSlashFilter implements Filter {
 
@@ -56,19 +64,53 @@ public class TrailingSlashFilter implements Filter {
     }
 
     @Override
-    public void sendRedirect(String location) throws IOException {
-      if (location.contains(path)) {
+    public void sendError(int status) throws IOException {
+
+      ServletContext context = request.getServletContext();
+      String realPath = context.getRealPath(getPathPartFromPath(path));
+      String pathSuffix = "";
+      if (realPath != null) {
+        File file = new File(realPath);
+        if (file.isDirectory()) {
+          pathSuffix = "/";
+        }
+      }
+
+      var previousPath = (String) request.getAttribute("WireMock.SendError");
+      if (previousPath == null) {
         RequestDispatcher dispatcher =
-            request.getRequestDispatcher(getPathPartFromLocation(location));
+            request.getRequestDispatcher("/__files/" + getPathPartFromPath(path) + pathSuffix);
+        request.setAttribute("WireMock.SendError", path);
         try {
-          dispatcher.forward(request, this);
+          dispatcher.forward(request, getResponse());
         } catch (ServletException se) {
           throw new IOException(se);
         }
+      } else {
+        Optional.ofNullable(request.getAttribute(ServeEvent.ORIGINAL_SERVE_EVENT_KEY))
+            .map(ServeEvent.class::cast)
+            .flatMap(ServeEvent::getDiffSubEvent)
+            .ifPresentOrElse(
+                diffSubEvent -> {
+                  final DiffEventData diffData = diffSubEvent.getDataAs(DiffEventData.class);
+                  this.setStatus(diffData.getStatus());
+                  (this.getResponse()).setContentType((diffData.getContentType()));
+                  (this.getResponse()).setCharacterEncoding(StandardCharsets.UTF_8.name());
+
+                  try (final PrintWriter writer = (this.getResponse()).getWriter()) {
+                    writer.write(diffData.getReport());
+                    writer.flush();
+                  } catch (IOException e) {
+                    throwUnchecked(e);
+                  }
+                },
+                () ->
+                    Exceptions.uncheck(
+                        () -> ((HttpServletResponse) this.getResponse()).sendError(404)));
       }
     }
 
-    private String getPathPartFromLocation(String location) throws IOException {
+    private String getPathPartFromPath(String location) throws IOException {
       if (isRelativePath(location)) {
         return location;
       }

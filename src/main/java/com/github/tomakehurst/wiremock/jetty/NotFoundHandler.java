@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2022 Thomas Akehurst
+ * Copyright (C) 2017-2023 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +17,19 @@ package com.github.tomakehurst.wiremock.jetty;
 
 import static com.github.tomakehurst.wiremock.common.Exceptions.throwUnchecked;
 
-import jakarta.servlet.ServletContext;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import com.github.tomakehurst.wiremock.common.Exceptions;
+import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
+import com.github.tomakehurst.wiremock.verification.diff.DiffEventData;
 import java.io.IOException;
-import org.eclipse.jetty.server.Dispatcher;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
+import org.eclipse.jetty.ee10.servlet.*;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ErrorHandler;
+import org.eclipse.jetty.util.Callback;
 
 public class NotFoundHandler extends ErrorHandler {
 
@@ -43,32 +47,51 @@ public class NotFoundHandler extends ErrorHandler {
   }
 
   @Override
-  public void handle(
-      String target,
-      final Request baseRequest,
-      final HttpServletRequest request,
-      HttpServletResponse response)
-      throws IOException {
+  public boolean handle(Request request, Response response, Callback callback) {
     if (response.getStatus() == 404) {
 
-      ServletContext adminContext = mockServiceHandler.getServletContext().getContext("/__admin");
-      Dispatcher requestDispatcher = (Dispatcher) adminContext.getRequestDispatcher("/not-matched");
+      Optional.ofNullable(request.getAttribute(ServeEvent.ORIGINAL_SERVE_EVENT_KEY))
+          .map(ServeEvent.class::cast)
+          .flatMap(ServeEvent::getDiffSubEvent)
+          .ifPresentOrElse(
+              diffSubEvent -> {
+                final DiffEventData diffData = diffSubEvent.getDataAs(DiffEventData.class);
+                response.setStatus(diffData.getStatus());
+                ((ServletContextResponse) response)
+                    .getServletApiResponse()
+                    .setContentType((diffData.getContentType()));
+                ((ServletContextResponse) response)
+                    .getServletApiResponse()
+                    .setCharacterEncoding(StandardCharsets.UTF_8.name());
 
-      try {
-        requestDispatcher.error(request, response);
-      } catch (ServletException e) {
-        throwUnchecked(e);
-      }
+                try (final PrintWriter writer =
+                    ((ServletContextResponse) response).getServletApiResponse().getWriter()) {
+                  writer.write(diffData.getReport());
+                  writer.flush();
+                } catch (IOException e) {
+                  throwUnchecked(e);
+                }
+              },
+              () ->
+                  Exceptions.uncheck(
+                      () ->
+                          ((ServletContextResponse) response)
+                              .getServletApiResponse()
+                              .sendError(404)));
+
     } else {
       try {
-        DEFAULT_HANDLER.handle(target, baseRequest, request, response);
+        DEFAULT_HANDLER.handle(request, response, Callback.NOOP);
       } catch (Exception e) {
         if (e instanceof IOException) {
-          throw (IOException) e;
+          callback.failed(e);
+          throwUnchecked(e);
         }
-
+        callback.failed(e);
         throwUnchecked(e);
       }
     }
+    callback.succeeded();
+    return true;
   }
 }

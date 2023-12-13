@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Thomas Akehurst
+ * Copyright (C) 2016-2023 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,12 +23,11 @@ import com.github.tomakehurst.wiremock.common.FileSource;
 import com.github.tomakehurst.wiremock.common.Notifier;
 import com.github.tomakehurst.wiremock.core.Options;
 import com.github.tomakehurst.wiremock.http.*;
-import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.HandlerCollection;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 
 public class AltHttpServerFactory implements HttpServerFactory {
 
@@ -45,8 +44,8 @@ public class AltHttpServerFactory implements HttpServerFactory {
     ServletContextHandler mockServiceContext =
         addMockServiceContext(jettyServer, stubRequestHandler, options.filesRoot(), notifier);
 
-    HandlerCollection handlers = new HandlerCollection();
-    handlers.setHandlers(new Handler[] {adminContext, mockServiceContext});
+    ContextHandlerCollection handlers = new ContextHandlerCollection();
+    handlers.setHandlers(adminContext, mockServiceContext);
     jettyServer.setHandler(handlers);
 
     return new HttpServer() {
@@ -92,7 +91,7 @@ public class AltHttpServerFactory implements HttpServerFactory {
       StubRequestHandler stubRequestHandler,
       FileSource fileSource,
       Notifier notifier) {
-    ServletContextHandler mockServiceContext = new ServletContextHandler(jettyServer, "/");
+    ServletContextHandler mockServiceContext = new ServletContextHandler("/");
 
     mockServiceContext.setAttribute(StubRequestHandler.class.getName(), stubRequestHandler);
     mockServiceContext.setAttribute(Notifier.KEY, notifier);
@@ -108,7 +107,7 @@ public class AltHttpServerFactory implements HttpServerFactory {
 
   private ServletContextHandler addAdminContext(
       Server jettyServer, AdminRequestHandler adminRequestHandler, Notifier notifier) {
-    ServletContextHandler adminContext = new ServletContextHandler(jettyServer, ADMIN_CONTEXT_ROOT);
+    ServletContextHandler adminContext = new ServletContextHandler(ADMIN_CONTEXT_ROOT);
     ServletHolder servletHolder =
         adminContext.addServlet(WireMockHandlerDispatchingServlet.class, "/");
     servletHolder.setInitParameter(

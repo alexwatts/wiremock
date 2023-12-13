@@ -30,8 +30,6 @@ import com.github.tomakehurst.wiremock.http.StubRequestHandler;
 import com.github.tomakehurst.wiremock.http.trafficlistener.WiremockNetworkTrafficListener;
 import com.github.tomakehurst.wiremock.servlet.*;
 import jakarta.servlet.DispatcherType;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -42,21 +40,18 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.eclipse.jetty.http.MimeTypes;
+import org.eclipse.jetty.ee10.servlet.DefaultServlet;
+import org.eclipse.jetty.ee10.servlet.FilterHolder;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
+import org.eclipse.jetty.ee10.servlets.CrossOriginFilter;
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.io.NetworkTrafficListener;
-import org.eclipse.jetty.server.Handler;
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.server.*;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
-import org.eclipse.jetty.servlet.DefaultServlet;
-import org.eclipse.jetty.servlet.FilterHolder;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jetty.servlets.CrossOriginFilter;
+import org.eclipse.jetty.util.Callback;
 
 public abstract class JettyHttpServer implements HttpServer {
   private static final String FILES_URL_MATCH = String.format("/%s/*", WireMockApp.FILES_ROOT);
@@ -110,7 +105,7 @@ public abstract class JettyHttpServer implements HttpServer {
 
     applyAdditionalServerConfiguration(jettyServer, options);
 
-    final HandlerCollection handlers =
+    final Handler.Abstract handlers =
         createHandler(options, adminRequestHandler, stubRequestHandler);
     jettyServer.setHandler(handlers);
 
@@ -119,7 +114,7 @@ public abstract class JettyHttpServer implements HttpServer {
 
   protected void applyAdditionalServerConfiguration(Server jettyServer, Options options) {}
 
-  protected HandlerCollection createHandler(
+  protected Handler.Abstract createHandler(
       Options options,
       AdminRequestHandler adminRequestHandler,
       StubRequestHandler stubRequestHandler) {
@@ -135,23 +130,29 @@ public abstract class JettyHttpServer implements HttpServer {
             options.browserProxySettings().enabled(),
             notifier);
 
-    HandlerCollection handlers = new HandlerCollection();
-    AbstractHandler asyncTimeoutSettingHandler =
-        new AbstractHandler() {
+    ContextHandlerCollection handlers = new ContextHandlerCollection();
+    Handler.Abstract asyncTimeoutSettingHandler =
+        new Handler.Abstract() {
+
           @Override
-          public void handle(
-              final String target,
-              final Request baseRequest,
-              final HttpServletRequest request,
-              final HttpServletResponse response) {
-            baseRequest.getHttpChannel().getState().setTimeout(options.timeout());
+          public boolean handle(Request request, Response response, Callback callback)
+              throws Exception {
+            request
+                .getConnectionMetaData()
+                .getHttpConfiguration()
+                .setIdleTimeout(options.timeout());
+            return false;
           }
         };
+
     handlers.setHandlers(
-        ArrayUtils.addAll(extensionHandlers(), adminContext, asyncTimeoutSettingHandler));
+        ArrayUtils.addAll(
+            extensionHandlers(),
+            new ContextHandler(adminContext, "/__admin"),
+            asyncTimeoutSettingHandler));
 
     if (options.getGzipDisabled()) {
-      handlers.addHandler(mockServiceContext);
+      handlers.addHandler(new ContextHandler(mockServiceContext, "/"));
     } else {
       addGZipHandler(mockServiceContext, handlers);
     }
@@ -160,13 +161,13 @@ public abstract class JettyHttpServer implements HttpServer {
   }
 
   private void addGZipHandler(
-      ServletContextHandler mockServiceContext, HandlerCollection handlers) {
+      ServletContextHandler mockServiceContext, ContextHandlerCollection handlers) {
     try {
       GzipHandler gzipHandler = new GzipHandler();
       gzipHandler.addIncludedMethods(GZIPPABLE_METHODS);
-      gzipHandler.setHandler(mockServiceContext);
+      gzipHandler.setHandler(new ContextHandler(mockServiceContext, "/"));
       gzipHandler.setVary(null);
-      handlers.addHandler(gzipHandler);
+      handlers.addHandler(new ContextHandler(gzipHandler, "/"));
     } catch (Exception e) {
       throwUnchecked(e);
     }
@@ -281,14 +282,15 @@ public abstract class JettyHttpServer implements HttpServer {
       boolean stubCorsEnabled,
       boolean browserProxyingEnabled,
       Notifier notifier) {
-    ServletContextHandler mockServiceContext = new ServletContextHandler(jettyServer, "/");
+    ServletContextHandler mockServiceContext = new ServletContextHandler("/");
 
     decorateMockServiceContextBeforeConfig(mockServiceContext);
 
     mockServiceContext.setInitParameter("org.eclipse.jetty.servlet.Default.maxCacheSize", "0");
-    mockServiceContext.setInitParameter(
-        "org.eclipse.jetty.servlet.Default.resourceBase", fileSource.getPath());
-    mockServiceContext.setInitParameter("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
+
+    mockServiceContext.setBaseResourceAsString(fileSource.getPath());
+
+    mockServiceContext.setInitParameter("org.eclipse.jetty.servlet.Default.dirAllowed", "true");
 
     mockServiceContext.addServlet(DefaultServlet.class, FILES_URL_MATCH);
 
@@ -319,12 +321,10 @@ public abstract class JettyHttpServer implements HttpServer {
     mockServiceContext.setAttribute(
         MultipartRequestConfigurer.KEY, buildMultipartRequestConfigurer());
 
-    MimeTypes mimeTypes = new MimeTypes();
-    mimeTypes.addMimeMapping("json", "application/json");
-    mimeTypes.addMimeMapping("html", "text/html");
-    mimeTypes.addMimeMapping("xml", "application/xml");
-    mimeTypes.addMimeMapping("txt", "text/plain");
-    mockServiceContext.setMimeTypes(mimeTypes);
+    mockServiceContext.getMimeTypes().addMimeMapping("json", "application/json");
+    mockServiceContext.getMimeTypes().addMimeMapping("html", "text/html");
+    mockServiceContext.getMimeTypes().addMimeMapping("xml", "application/xml");
+    mockServiceContext.getMimeTypes().addMimeMapping("txt", "text/plain");
     mockServiceContext.setWelcomeFiles(
         new String[] {"index.json", "index.html", "index.xml", "index.txt"});
 
@@ -351,7 +351,7 @@ public abstract class JettyHttpServer implements HttpServer {
 
   private ServletContextHandler addAdminContext(
       AdminRequestHandler adminRequestHandler, Notifier notifier) {
-    ServletContextHandler adminContext = new ServletContextHandler(jettyServer, ADMIN_CONTEXT_ROOT);
+    ServletContextHandler adminContext = new ServletContextHandler(ADMIN_CONTEXT_ROOT);
 
     decorateAdminServiceContextBeforeConfig(adminContext);
 
@@ -365,16 +365,14 @@ public abstract class JettyHttpServer implements HttpServer {
       // assimilated into an apk.
       //  As resources can be addressed like "assets/swagger-ui/index.html", a static path element
       // will suffice.
-      adminContext.setInitParameter("org.eclipse.jetty.servlet.Default.resourceBase", "assets");
+      adminContext.setBaseResourceAsString("assets");
     } else {
-      adminContext.setInitParameter(
-          "org.eclipse.jetty.servlet.Default.resourceBase",
-          getResource(JettyHttpServer.class, "assets").toString());
+      adminContext.setBaseResourceAsString(getResource(JettyHttpServer.class, "assets").toString());
     }
 
     getResource(JettyHttpServer.class, "assets/swagger-ui/index.html");
 
-    adminContext.setInitParameter("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
+    adminContext.setInitParameter("org.eclipse.jetty.servlet.Default.dirAllowed", "true");
     ServletHolder swaggerUiServletHolder =
         adminContext.addServlet(DefaultServlet.class, "/swagger-ui/*");
     swaggerUiServletHolder.setAsyncSupported(false);

@@ -26,7 +26,7 @@ group = 'org.wiremock'
 project.ext {
   versions = [
     handlebars     : '4.3.1',
-    jetty          : '11.0.18',
+    jetty          : '12.0.3',
     guava          : '32.1.3-jre',
     jackson        : '2.15.3',
     xmlUnit        : '2.9.1',
@@ -41,12 +41,15 @@ configurations {
 
 dependencies {
   api platform("org.eclipse.jetty:jetty-bom:$versions.jetty")
-  api "org.eclipse.jetty:jetty-server"
-  api "org.eclipse.jetty:jetty-servlet"
-  api "org.eclipse.jetty:jetty-servlets"
-  api "org.eclipse.jetty:jetty-webapp"
-  api "org.eclipse.jetty:jetty-proxy"
-  api "org.eclipse.jetty.http2:http2-server"
+  api "org.eclipse.jetty:jetty-server:$versions.jetty"
+  api "org.eclipse.jetty.ee10:jetty-ee10-servlet:$versions.jetty"
+  api "org.eclipse.jetty.ee10:jetty-ee10-servlets:$versions.jetty"
+  api "org.eclipse.jetty.ee10:jetty-ee10-webapp:$versions.jetty"
+  api "org.eclipse.jetty.ee10:jetty-ee10-proxy:$versions.jetty"
+  api "org.eclipse.jetty.http2:jetty-http2-server:$versions.jetty"
+  api "org.eclipse.jetty.http2:jetty-http2-client:$versions.jetty"
+  api "org.eclipse.jetty.http2:jetty-http2-common:$versions.jetty"
+  api "org.eclipse.jetty.http2:jetty-http2-client-transport:$versions.jetty"
   api "org.eclipse.jetty:jetty-alpn-server"
   api "org.eclipse.jetty:jetty-alpn-java-server"
   api "org.eclipse.jetty:jetty-alpn-java-client"
@@ -119,8 +122,9 @@ dependencies {
   testImplementation 'org.scala-lang:scala-library:2.13.12'
   testImplementation 'com.tngtech.archunit:archunit-junit5:0.23.1'
 
-  testImplementation "org.eclipse.jetty:jetty-client"
-  testImplementation "org.eclipse.jetty.http2:http2-http-client-transport"
+  testImplementation "org.eclipse.jetty.ee10.websocket:jetty-ee10-websocket-jakarta-client:$versions.jetty"
+  testImplementation "org.eclipse.jetty.http2:jetty-http2-client-transport"
+  testImplementation  "org.eclipse.jetty.http2:jetty-http2-common:$versions.jetty"
   testRuntimeOnly "org.slf4j:log4j-over-slf4j:2.0.9"
   testRuntimeOnly "ch.qos.logback:logback-classic:1.4.0"
   testRuntimeOnly files('src/test/resources/classpath file source/classpathfiles.zip', 'src/test/resources/classpath-filesource.jar')
@@ -207,7 +211,7 @@ allprojects {
     mavenCentral()
   }
 
-  version = '3.3.1'
+  version = '3.3.5'
 
 
   sourceCompatibility = 11
@@ -235,6 +239,8 @@ allprojects {
     exclude 'ignored/**'
 
     maxParallelForks = runningOnCI ? 1 : 3
+
+    jvmArgs '--add-exports=java.base/sun.security.x509=ALL-UNNAMED'
 
     testLogging {
       events "FAILED", "SKIPPED"

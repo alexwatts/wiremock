@@ -23,7 +23,7 @@ import com.github.tomakehurst.wiremock.core.FaultInjector;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.Socket;
-import org.eclipse.jetty.server.Response;
+import org.eclipse.jetty.ee10.servlet.ServletApiResponse;
 import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.Callback;
 
@@ -31,7 +31,7 @@ public class JettyHttpsFaultInjector implements FaultInjector {
 
   private static final byte[] GARBAGE = "lskdu018973t09sylgasjkfg1][]'./.sdlv".getBytes(UTF_8);
 
-  private final Response response;
+  private final ServletApiResponse response;
   private final Socket socket;
 
   public JettyHttpsFaultInjector(HttpServletResponse response) {
@@ -76,8 +76,7 @@ public class JettyHttpsFaultInjector implements FaultInjector {
 
   private void writeGarbageThenCloseSocket() {
     response
-        .getHttpOutput()
-        .getHttpChannel()
+        .getServletChannel()
         .getEndPoint()
         .write(
             new Callback() {
@@ -88,6 +87,7 @@ public class JettyHttpsFaultInjector implements FaultInjector {
                 } catch (IOException e) {
                   notifier().error("Failed to close socket after Garbage write succeeded", e);
                 }
+                Callback.super.succeeded();
               }
 
               @Override
@@ -95,8 +95,9 @@ public class JettyHttpsFaultInjector implements FaultInjector {
                 try {
                   socket.close();
                 } catch (IOException e) {
-                  notifier().error("Failed to close socket after Garbage write failed", e);
+                  notifier().error("Failed to close socket after Garbage write succeeded", e);
                 }
+                Callback.super.failed(x);
               }
             },
             BufferUtil.toBuffer(GARBAGE));

@@ -15,7 +15,7 @@
  */
 package com.github.tomakehurst.wiremock.jetty11;
 
-import static com.github.tomakehurst.wiremock.jetty11.Jetty11Utils.createHttpConfig;
+import static com.github.tomakehurst.wiremock.jetty11.Jetty12Utils.createHttpConfig;
 import static com.github.tomakehurst.wiremock.jetty11.SslContexts.buildManInTheMiddleSslContextFactory;
 
 import com.github.tomakehurst.wiremock.common.HttpsSettings;
@@ -25,19 +25,19 @@ import com.github.tomakehurst.wiremock.http.AdminRequestHandler;
 import com.github.tomakehurst.wiremock.http.StubRequestHandler;
 import com.github.tomakehurst.wiremock.jetty.JettyHttpServer;
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
-import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
 import org.eclipse.jetty.http2.server.HTTP2ServerConnectionFactory;
 import org.eclipse.jetty.io.NetworkTrafficListener;
 import org.eclipse.jetty.server.*;
-import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
-public class Jetty11HttpServer extends JettyHttpServer {
+public class Jetty12HttpServer extends JettyHttpServer {
 
   private ServerConnector mitmProxyConnector;
 
-  public Jetty11HttpServer(
+  public Jetty12HttpServer(
       Options options,
       AdminRequestHandler adminRequestHandler,
       StubRequestHandler stubRequestHandler) {
@@ -52,7 +52,7 @@ public class Jetty11HttpServer extends JettyHttpServer {
 
     HTTP2CServerConnectionFactory h2c = new HTTP2CServerConnectionFactory(httpConfig);
 
-    return Jetty11Utils.createServerConnector(
+    return Jetty12Utils.createServerConnector(
         jettyServer,
         bindAddress,
         jettySettings,
@@ -91,7 +91,7 @@ public class Jetty11HttpServer extends JettyHttpServer {
       connectionFactories = new ConnectionFactory[] {ssl, http};
     }
 
-    return Jetty11Utils.createServerConnector(
+    return Jetty12Utils.createServerConnector(
         jettyServer,
         bindAddress,
         jettySettings,
@@ -101,19 +101,29 @@ public class Jetty11HttpServer extends JettyHttpServer {
   }
 
   @Override
-  protected HandlerCollection createHandler(
+  protected Handler.Abstract createHandler(
       Options options,
       AdminRequestHandler adminRequestHandler,
       StubRequestHandler stubRequestHandler) {
-    HandlerCollection handler =
+    Handler.Abstract mainHandlerChain =
         super.createHandler(options, adminRequestHandler, stubRequestHandler);
 
-    if (options.browserProxySettings().enabled()) {
-      handler.prependHandler(new HttpsProxyDetectingHandler(mitmProxyConnector));
-      handler.prependHandler(new ManInTheMiddleSslConnectHandler(mitmProxyConnector));
-    }
+    Handler.Sequence proxyHandlers = new Handler.Sequence();
+    proxyHandlers.addHandler(new ContextHandler(new EarliestUrlRecordingHandler(), "/"));
+    proxyHandlers.addHandler(
+        new ContextHandler(new HttpsProxyDetectingHandler(mitmProxyConnector), "/"));
+    proxyHandlers.addHandler(
+        new ContextHandler(new ManInTheMiddleSslConnectHandler(mitmProxyConnector), "/"));
 
-    return handler;
+    ContextHandlerCollection mainAndProxyHandlers = new ContextHandlerCollection();
+    mainAndProxyHandlers.addHandler(new ContextHandler(proxyHandlers, "/"));
+    mainAndProxyHandlers.addHandler(new ContextHandler(mainHandlerChain, "/"));
+
+    if (options.browserProxySettings().enabled()) {
+      return mainAndProxyHandlers;
+    } else {
+      return mainHandlerChain;
+    }
   }
 
   @Override
@@ -144,7 +154,7 @@ public class Jetty11HttpServer extends JettyHttpServer {
               could do this. It might be possible to write one using
               Netty, but it would be hard and time consuming.
                */
-              HttpVersion.HTTP_1_1.asString());
+              "HTTP/1.1");
 
       JettySettings jettySettings = options.jettySettings();
       HttpConfiguration httpConfig = createHttpConfig(jettySettings);

@@ -21,9 +21,9 @@ import com.github.tomakehurst.wiremock.common.JettySettings;
 import org.eclipse.jetty.io.NetworkTrafficListener;
 import org.eclipse.jetty.server.*;
 
-public class Jetty11Utils {
+public class Jetty12Utils {
 
-  private Jetty11Utils() {}
+  private Jetty12Utils() {}
 
   private static final int DEFAULT_ACCEPTORS = 3;
   private static final int DEFAULT_HEADER_SIZE = 32768;

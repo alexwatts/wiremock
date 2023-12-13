@@ -129,28 +129,9 @@ public class ServletContextFileSourceTest {
       return null;
     }
 
-    @Override
-    public Servlet getServlet(String name) throws ServletException {
-      return null;
-    }
-
     @SuppressWarnings("rawtypes")
-    @Override
-    public Enumeration getServlets() {
-      return null;
-    }
-
-    @SuppressWarnings("rawtypes")
-    @Override
-    public Enumeration getServletNames() {
-      return null;
-    }
-
     @Override
     public void log(String msg) {}
-
-    @Override
-    public void log(Exception exception, String msg) {}
 
     @Override
     public void log(String message, Throwable throwable) {}

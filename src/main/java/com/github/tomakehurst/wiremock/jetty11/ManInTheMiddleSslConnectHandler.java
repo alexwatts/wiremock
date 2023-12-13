@@ -17,12 +17,11 @@ package com.github.tomakehurst.wiremock.jetty11;
 
 import static com.github.tomakehurst.wiremock.common.ParameterUtils.getFirstNonNull;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.io.Closeable;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
-import org.eclipse.jetty.proxy.ConnectHandler;
 import org.eclipse.jetty.server.*;
+import org.eclipse.jetty.server.handler.ConnectHandler;
 import org.eclipse.jetty.util.Promise;
 
 public class ManInTheMiddleSslConnectHandler extends ConnectHandler {
@@ -35,20 +34,15 @@ public class ManInTheMiddleSslConnectHandler extends ConnectHandler {
 
   @Override
   protected void connectToServer(
-      HttpServletRequest request,
-      String ignoredHost,
-      int ignoredPort,
-      Promise<SocketChannel> promise) {
+      Request request, String ignoredHost, int ignoredPort, Promise<SocketChannel> promise) {
     SocketChannel channel = null;
     try {
       channel = SocketChannel.open();
       channel.socket().setTcpNoDelay(true);
       channel.configureBlocking(false);
-
-      String host = getFirstNonNull(mitmProxyConnector.getHost(), "localhost");
-      int port = mitmProxyConnector.getLocalPort();
-      InetSocketAddress address = newConnectAddress(host, port);
-
+      String realHost = getFirstNonNull(mitmProxyConnector.getHost(), "localhost");
+      int realPort = mitmProxyConnector.getLocalPort();
+      InetSocketAddress address = newConnectAddress(realHost, realPort);
       channel.connect(address);
       promise.succeeded(channel);
     } catch (Throwable x) {

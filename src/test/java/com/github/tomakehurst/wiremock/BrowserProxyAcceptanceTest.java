@@ -25,10 +25,7 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.github.tomakehurst.wiremock.testsupport.WireMockResponse;
 import com.github.tomakehurst.wiremock.testsupport.WireMockTestClient;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 class BrowserProxyAcceptanceTest {
@@ -40,7 +37,7 @@ class BrowserProxyAcceptanceTest {
   private WireMockTestClient testClient;
 
   @BeforeEach
-  public void init() {
+  public void init() throws Exception {
     testClient = new WireMockTestClient(target.getPort());
 
     proxy = new WireMockServer(wireMockConfig().port(8111).enableBrowserProxying(true));
@@ -55,7 +52,8 @@ class BrowserProxyAcceptanceTest {
   }
 
   @Test
-  public void canProxyHttp() {
+  public void canProxyHttp() throws Exception {
+
     target.stubFor(get("/whatever").willReturn(aResponse().withBody("Got it")));
 
     assertThat(

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2023 Thomas Akehurst
+ * Copyright (C) 2023 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.tomakehurst.wiremock.jetty;
+package com.github.tomakehurst.wiremock.servlet;
 
-import com.github.tomakehurst.wiremock.servlet.MultipartRequestConfigurer;
-import jakarta.servlet.MultipartConfigElement;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 
-public class DefaultMultipartRequestConfigurer implements MultipartRequestConfigurer {
+public class CustomHttpServletRequest extends HttpServletRequestWrapper {
+
+  public CustomHttpServletRequest(HttpServletRequest request) {
+    super(request);
+  }
 
   @Override
-  public void configure(HttpServletRequest request) {
-    request.setAttribute(
-        "org.eclipse.multipartConfig",
-        new MultipartConfigElement(
-            System.getProperty("java.io.tmpdir"), Integer.MAX_VALUE, -1L, 0));
+  public String getPathInfo() {
+    return "/__files" + super.getPathInfo();
   }
 }

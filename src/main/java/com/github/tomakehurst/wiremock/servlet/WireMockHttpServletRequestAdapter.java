@@ -204,7 +204,7 @@ public class WireMockHttpServletRequestAdapter implements Request {
 
   private static HttpHeaders getHeadersLinear(org.eclipse.jetty.server.Request request) {
     List<HttpHeader> headers =
-        request.getHttpFields().stream()
+        request.getHeaders().stream()
             .map(field -> HttpHeader.httpHeader(field.getName(), field.getValue()))
             .collect(Collectors.toList());
     return new HttpHeaders(headers);

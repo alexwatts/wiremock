@@ -15,19 +15,18 @@
  */
 package com.github.tomakehurst.wiremock.jetty;
 
-import static com.github.tomakehurst.wiremock.common.Exceptions.throwUnchecked;
 import static com.github.tomakehurst.wiremock.jetty11.HttpsProxyDetectingHandler.IS_HTTPS_PROXY_REQUEST_ATTRIBUTE;
 
-import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpServletResponseWrapper;
 import java.net.Socket;
 import java.nio.channels.SocketChannel;
+import org.eclipse.jetty.ee10.servlet.ServletApiRequest;
+import org.eclipse.jetty.ee10.servlet.ServletApiResponse;
+import org.eclipse.jetty.ee10.servlet.ServletChannel;
+import org.eclipse.jetty.io.SelectableChannelEndPoint;
 import org.eclipse.jetty.io.ssl.SslConnection;
-import org.eclipse.jetty.server.HttpChannel;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.Response;
 
 public class JettyUtils {
 
@@ -57,36 +56,32 @@ public class JettyUtils {
     }
   }
 
-  public static Response unwrapResponse(HttpServletResponse httpServletResponse) {
-    if (httpServletResponse instanceof HttpServletResponseWrapper) {
-      ServletResponse unwrapped = ((HttpServletResponseWrapper) httpServletResponse).getResponse();
-      return (Response) unwrapped;
+  public static ServletApiResponse unwrapResponse(HttpServletResponse httpServletResponse) {
+    if (httpServletResponse instanceof ServletApiResponse) {
+      ServletApiResponse unwrapped = ((ServletApiResponse) httpServletResponse);
+      return unwrapped;
     }
 
-    return (Response) httpServletResponse;
+    return (ServletApiResponse) httpServletResponse;
   }
 
-  public static Socket getTlsSocket(Response response) {
-    HttpChannel httpChannel = response.getHttpOutput().getHttpChannel();
-    SslConnection.DecryptedEndPoint sslEndpoint =
-        (SslConnection.DecryptedEndPoint) httpChannel.getEndPoint();
-    Object endpoint = sslEndpoint.getSslConnection().getEndPoint();
-    try {
-      final SocketChannel channel =
-          (SocketChannel) endpoint.getClass().getMethod("getChannel").invoke(endpoint);
-      return channel.socket();
-    } catch (Exception e) {
-      return throwUnchecked(e, Socket.class);
-    }
+  public static Socket getTlsSocket(ServletApiResponse response) {
+    ServletChannel httpChannel = response.getServletChannel();
+    SslConnection.SslEndPoint ep = (SslConnection.SslEndPoint) httpChannel.getEndPoint();
+    return ((SocketChannel) ((SelectableChannelEndPoint) ep.getTransport()).getChannel()).socket();
   }
 
   public static boolean isBrowserProxyRequest(HttpServletRequest request) {
-    if (request instanceof Request) {
-      Request jettyRequest = (Request) request;
-      return Boolean.TRUE.equals(request.getAttribute(IS_HTTPS_PROXY_REQUEST_ATTRIBUTE))
-          || "http".equals(jettyRequest.getMetaData().getURI().getScheme());
+    if (((ServletApiRequest) request).getRequest() != null) {
+      Request jettyRequest = ((ServletApiRequest) request).getRequest();
+      return Boolean.TRUE.equals(jettyRequest.getAttribute(IS_HTTPS_PROXY_REQUEST_ATTRIBUTE))
+          || !serverAuthorityPortMatchesRequestUri(jettyRequest);
     }
-
     return false;
+  }
+
+  private static boolean serverAuthorityPortMatchesRequestUri(Request jettyRequest) {
+    int serverAuthorityPort = jettyRequest.getConnectionMetaData().getServerAuthority().getPort();
+    return jettyRequest.getHttpURI().getPort() == serverAuthorityPort;
   }
 }

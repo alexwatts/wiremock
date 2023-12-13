@@ -24,16 +24,16 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.channels.SocketChannel;
+import org.eclipse.jetty.ee10.servlet.ServletApiResponse;
+import org.eclipse.jetty.ee10.servlet.ServletChannel;
 import org.eclipse.jetty.io.SelectableChannelEndPoint;
-import org.eclipse.jetty.server.HttpChannel;
-import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.util.BufferUtil;
 
 public class JettyFaultInjector implements FaultInjector {
 
   private static final byte[] GARBAGE = "lskdu018973t09sylgasjkfg1][]'./.sdlv".getBytes(UTF_8);
 
-  private final Response response;
+  private final ServletApiResponse response;
   private final Socket socket;
 
   public JettyFaultInjector(HttpServletResponse response) {
@@ -83,7 +83,7 @@ public class JettyFaultInjector implements FaultInjector {
   }
 
   private Socket socket() {
-    HttpChannel httpChannel = response.getHttpOutput().getHttpChannel();
+    ServletChannel httpChannel = response.getServletChannel();
     SelectableChannelEndPoint ep = (SelectableChannelEndPoint) httpChannel.getEndPoint();
     return ((SocketChannel) ep.getChannel()).socket();
   }

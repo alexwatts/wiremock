@@ -66,11 +66,7 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuil
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.core5.http.HttpHost;
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.HttpProxy;
-import org.eclipse.jetty.client.Origin;
-import org.eclipse.jetty.client.ProxyConfiguration;
-import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
